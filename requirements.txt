@@ -3,6 +3,6 @@ pandas
 numpy
 flask
 werkzeug
-get
 requests
 opencv-python
+torch==1.11.0+cpu

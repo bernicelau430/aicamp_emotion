@@ -3,9 +3,7 @@ from flask import Flask, flash, request, redirect, url_for
 from werkzeug.utils import secure_filename
 from flask import render_template
 import os
-from ai import get_yolo_net, yolo_forward, yolo_save_img
-import cv2
-import numpy as np
+import torch
 
 UPLOAD_FOLDER = 'images'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
@@ -14,19 +12,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
-here = os.getcwd()
-names_path = os.path.join(os.path.abspath(os.path.join(
-    here, os.pardir)), 'yolo_training', 'clem.names')
-LABELS = open(names_path).read().strip().split("\n")
-np.random.seed(42)
-COLORS = np.random.randint(0, 255, size=(len(LABELS), 3),
-                           dtype="uint8")
-weights_path = os.path.join(os.path.abspath(os.path.join(
-    here, os.pardir)), 'yolo_training', 'clem-yolov3-tiny2_best.weights')
-cfg_path = os.path.join(os.path.abspath(os.path.join(
-    here, os.pardir)), 'yolo_training', 'clem-yolov3-tiny.cfg')
-net = get_yolo_net(cfg_path, weights_path)
-
+model = torch.hub.load("ultralytics/yolov5", "custom", path = '../yolo_training/best.pt', force_reload=True)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -61,18 +47,10 @@ def home():
 def uploaded_file(filename):
     here = os.getcwd()
     image_path = os.path.join(here, app.config['UPLOAD_FOLDER'], filename)
-    image = cv2.imread(image_path)
-    (class_ids, labels, boxes, confidences) = yolo_forward(
-        net, LABELS, image, confidence_level=0.3)
-    if len(class_ids) > 0:
-        found = True
-        new_filename = 'yolo_' + filename
-        file_path = os.path.join(
-            here, app.config['UPLOAD_FOLDER'], new_filename)
-        yolo_save_img(image, class_ids, boxes, labels,
-                      confidences, COLORS, file_path=file_path)
-        # function to add correct and or comma
-
+    results = model(image_path, size=416)
+    if len(results.pandas().xyxy) > 0:
+        results.print()
+        results.save(save_dir=os.path.join(here, app.config['UPLOAD_FOLDER']))
         def and_syntax(alist):
             if len(alist) == 1:
                 alist = "".join(alist)
@@ -86,18 +64,21 @@ def uploaded_file(filename):
                 return alist
             else:
                 return
+        confidences = list(results.pandas().xyxy[0]['confidence'])
         # confidences: rounding and changing to percent, putting in function
         format_confidences = []
         for percent in confidences:
             format_confidences.append(str(round(percent*100)) + '%')
         format_confidences = and_syntax(format_confidences)
+
+        labels = list(results.pandas().xyxy[0]['name'])
         # labels: sorting and capitalizing, putting into function
         labels = set(labels)
         labels = [emotion.capitalize() for emotion in labels]
         labels = and_syntax(labels)
         return render_template('results.html', confidences=format_confidences, labels=labels,
                                old_filename=filename,
-                               filename=new_filename)
+                               filename=filename)
     else:
         found = False
         return render_template('results.html', labels='No Emotion', old_filename=filename, filename=filename)
@@ -106,3 +87,6 @@ def uploaded_file(filename):
 @app.route('/files/<path:filename>')
 def files(filename):
     return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
+
+if __name__=="__main__":
+    app.run()
