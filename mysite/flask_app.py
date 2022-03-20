@@ -4,11 +4,21 @@ from werkzeug.utils import secure_filename
 from flask import render_template
 import os
 import torch
+import json
 
-UPLOAD_FOLDER = 'images'
+port = 6666
+def get_base_url(port):
+    info = json.load(open(os.path.join(os.environ['HOME'], ".smc", "info.json"), 'r'))
+    project_id = info['project_id']
+    base_url = "/%s/port/%s/" % (project_id, port)
+    return base_url
+
+base_url = get_base_url(port)
+app = Flask(__name__, static_url_path=base_url+'static')
+
+UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
-app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
@@ -19,7 +29,7 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route(base_url, methods=['GET', 'POST'])
 def home():
     if request.method == 'POST':
         # check if the post request has the file part
@@ -43,14 +53,15 @@ def home():
     return render_template('home.html')
 
 
-@app.route('/uploads/<filename>')
+@app.route(base_url + '/uploads/<filename>')
 def uploaded_file(filename):
     here = os.getcwd()
     image_path = os.path.join(here, app.config['UPLOAD_FOLDER'], filename)
     results = model(image_path, size=416)
     if len(results.pandas().xyxy) > 0:
         results.print()
-        results.save(save_dir=os.path.join(here, app.config['UPLOAD_FOLDER']))
+        save_dir = os.path.join(here, app.config['UPLOAD_FOLDER'])
+        results.save(save_dir=save_dir)
         def and_syntax(alist):
             if len(alist) == 1:
                 alist = "".join(alist)
@@ -88,5 +99,14 @@ def uploaded_file(filename):
 def files(filename):
     return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
 
-if __name__=="__main__":
-    app.run()
+if __name__ == "__main__":
+    '''
+    coding center code
+    '''
+    # IMPORTANT: change the cocalcx.ai-camp.org to the site where you are editing this file.
+    website_url = 'gpu.ai-camp.dev'
+    print(f"Try to open\n\n    https://{website_url}" + base_url + '\n\n')
+
+    # remove debug=True when deploying it
+    app.run(host = '0.0.0.0', port=port, debug=True)
+    import sys; sys.exit(0)

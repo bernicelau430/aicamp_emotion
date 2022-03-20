@@ -18,7 +18,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top header-white main-nav navbar-togglable">
         <div class="container">
             <a class="navbar-brand" href="/#">
-                <img src="/static/images1/ai camp logo1.svg" width="55" height="55" alt="">
+                <img src="{{ url_for('static', filename='images1/ai camp logo1.svg')}}" width="55" height="55" alt="">
               </a>
             <a class="navbar-brand " href="/#">
                 <h3 class="colored-text">Emotion Detector</h3>
@@ -98,7 +98,7 @@
                     </a>
                 </div>
                 <div class="col">
-                    <img class="mbr-figure" src="{{ url_for('files', filename=filename) }}">
+                    <img class="mbr-figure" src="{{ url_for('static', filename='uploads/' + filename)}}">
                 </div>
                 </div>
             </div>
